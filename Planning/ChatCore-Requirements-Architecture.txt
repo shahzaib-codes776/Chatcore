@@ -1,0 +1,171 @@
+# Project Requirements & Architecture Document
+
+**Project Name:** ChatCore (working name)
+**Prepared by:** DelVoxe
+**Date:** July 2026
+**Version:** 1.0 — Enterprise-Grade Build
+
+---
+
+## 1. Product Vision
+
+An AI-powered chat widget that any business — from a solo shop to a growing company — can embed on their website. It learns from the business's own content (FAQs, services, documents) and answers visitor questions instantly, captures leads, and hands off to a human when needed.
+
+**Long-term vision:** A single product with tiers, so DelVoxe can sell it to small local clients today and scale the same core system to bigger clients later — without rebuilding it from scratch.
+
+---
+
+## 2. Why This Is Being Built "Enterprise-Grade" From Day One
+
+Most student projects skip these and pay for it later. We are doing them from the start:
+
+- **Security** — API keys, user data, and client data must never be exposed or leaked
+- **Proper architecture** — frontend and backend separated, not everything jammed into one file
+- **Data privacy** — each client's data (their FAQs, their conversations) must stay isolated from other clients
+- **Scalability** — the system should handle 1 client or 100 clients without a redesign
+
+---
+
+## 3. Core User Roles
+
+| Role | What they do |
+|---|---|
+| **Business Owner (Client)** | Signs up, uploads their business info/FAQs, gets an embed code, views their chat analytics |
+| **Website Visitor** | Talks to the chat widget on the client's website — no login needed |
+| **DelVoxe Admin** | Manages all client accounts, monitors system health, handles billing (future) |
+
+---
+
+## 4. Feature Set by Tier
+
+### 🟢 Tier 1 — Foundation (Build first, fully, before anything else)
+- Business owner signup/login (secure authentication)
+- Dashboard to add business info (name, services, FAQs, tone of voice)
+- AI chat widget (embeddable via a single script tag)
+- Widget answers visitor questions using only that business's uploaded data
+- Lead capture: name, email, question, saved to that business's dashboard
+- Basic analytics: total conversations, most-asked questions
+- Each client's data fully isolated from every other client's data
+
+### 🟡 Tier 2 — Growth (only after Tier 1 is fully built, tested, and understood)
+- Custom widget branding (colors, logo, welcome message) per client
+- Multiple knowledge sources (upload PDFs, multiple FAQ pages)
+- Human handoff: flag conversations the AI couldn't resolve, notify the business owner
+- Improved analytics (peak hours, resolution rate)
+
+### 🔴 Tier 3 — Enterprise (future, not part of this build cycle)
+- Multi-channel support (WhatsApp, Instagram)
+- CRM integrations (HubSpot, Salesforce)
+- Team accounts with roles/permissions
+- Compliance features (audit logs, data export/delete tools for GDPR-style requests)
+
+**Rule, same as before but stricter this time: Tier 2 does not start until every Tier 1 item is built, tested by you personally, and working without bugs.**
+
+---
+
+## 5. Technical Architecture
+
+### 5.1 High-Level Structure
+
+```
+Visitor's Browser (widget)  →  Backend API  →  Database
+                                     ↓
+                              Claude API (Anthropic)
+```
+
+The widget never talks to the AI directly. It always goes through **our own backend**. This is the single most important security rule in this entire project — explained in Section 6.
+
+### 5.2 Tech Stack (Decided)
+
+| Layer | Technology | Why |
+|---|---|---|
+| Frontend (dashboard) | React | Matches what you're already building/learning |
+| Embeddable widget | Vanilla JavaScript | Must be lightweight and work on any website, regardless of that site's own framework |
+| Backend | Node.js + Express | Industry-standard, well documented, huge community for a learner |
+| Database | PostgreSQL | Proper relational database — needed to keep each client's data cleanly separated |
+| Authentication | JWT (JSON Web Tokens) + hashed passwords (bcrypt) | Industry-standard secure login method |
+| AI | Claude API (claude-sonnet-4-6) | Already used and understood |
+| Hosting (backend) | Render or Railway (free tier to start) | Free, simple deployment for Node.js apps |
+| Hosting (frontend) | Netlify | Already familiar from DelVoxe site |
+
+### 5.3 Folder Structure (industry-standard separation)
+
+```
+chatcore/
+├── backend/
+│   ├── src/
+│   │   ├── routes/          (API endpoints: /auth, /business, /chat, /leads)
+│   │   ├── controllers/     (logic for each route)
+│   │   ├── models/          (database schemas: User, Business, Conversation, Lead)
+│   │   ├── middleware/      (auth checks, rate limiting, input validation)
+│   │   └── config/          (database connection, environment setup)
+│   ├── .env                 (secrets — NEVER committed to GitHub)
+│   └── package.json
+├── dashboard/                (React app — business owner's control panel)
+│   └── src/
+├── widget/                   (the embeddable chat widget — plain JS)
+│   └── widget.js
+└── docs/                     (this document and future ones)
+```
+
+---
+
+## 6. Security Requirements (Non-Negotiable)
+
+This is the part most beginner projects get wrong. We will not.
+
+1. **API keys never touch the frontend or the widget.** The Claude API key lives only on the backend server, in an environment variable (`.env` file), never in any React or JavaScript code a visitor's browser can see.
+2. **Passwords are hashed**, never stored as plain text (using bcrypt).
+3. **Authentication uses JWT tokens** with expiry — no permanent unprotected sessions.
+4. **Every database query is scoped to the logged-in business owner's own data.** One client must never be able to see another client's FAQs, conversations, or leads.
+5. **Input validation on every form and API endpoint** — never trust data coming from the browser.
+6. **Rate limiting** on the chat endpoint, so one visitor (or a bot/attacker) cannot spam requests and run up the AI bill or crash the server.
+7. **CORS configured properly** — only allow the widget to call our backend from approved domains.
+8. **`.env` file and secrets are excluded from Git** from the very first commit (`.gitignore` set up correctly).
+
+---
+
+## 7. Realistic Timeline (No Rushing — Enterprise Pace)
+
+| Phase | What happens | Est. time |
+|---|---|---|
+| Phase 1 — Requirements & Architecture | This document | Done |
+| Phase 2 — Environment Setup | Node.js, PostgreSQL, GitHub repo, project skeleton, `.gitignore` | 3-4 days |
+| Phase 3 — Backend Foundation | Database schema, authentication (signup/login), basic API structure | 1-1.5 weeks |
+| Phase 4 — Core Feature: Business Dashboard | Business owner can log in and add their business info/FAQs | 4-6 days |
+| Phase 5 — Core Feature: AI Chat Endpoint | Backend securely calls Claude API using that business's data | 4-6 days |
+| Phase 6 — Embeddable Widget | The actual chat bubble that goes on a client's website | 5-7 days |
+| Phase 7 — Lead Capture + Analytics | Save visitor info, show basic stats on dashboard | 4-5 days |
+| Phase 8 — Testing | Test as a real business owner would use it, fix bugs, test security | 1 week |
+| Phase 9 — Deployment | Backend on Render/Railway, dashboard on Netlify, real domain | 3-4 days |
+| Phase 10 — First Real Client Install | Put the widget on one real DelVoxe client's site as a pilot | Ongoing |
+
+**Total to a real, working, secure Tier 1 product: roughly 6-8 weeks, working consistently, without skipping the boring parts.**
+
+---
+
+## 8. Definition of Done (Tier 1)
+
+Tier 1 is complete only when ALL of these are true:
+1. A business owner can sign up, log in, and their password is properly secured
+2. They can add their business's FAQs/info through the dashboard
+3. The embeddable widget, placed on any test website, answers questions using only that business's data
+4. No API key or secret is visible anywhere in browser dev tools (Network tab, page source)
+5. A second test business account cannot see the first business's data under any circumstance
+6. Leads are captured and viewable on the dashboard
+7. The whole system is live on real hosting, not just running on your laptop
+
+---
+
+## 9. What You Will Actually Learn Building This
+
+- Real authentication (how login systems actually work, not just theory)
+- Database design and relationships
+- Secure API design (this is a skill companies pay well for)
+- Environment variables and secrets management
+- Full deployment of a multi-part system (frontend + backend + database)
+- How SaaS products are structured for multiple customers (multi-tenancy)
+
+---
+
+*Next: Phase 2 — Environment Setup. This is where we install everything and set up the project skeleton correctly before writing a single feature.*
