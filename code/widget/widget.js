@@ -12,14 +12,18 @@
 
   let visitorName = "";
   let visitorEmail = "";
-  let leadCaptured = false;
+  let widgetColor = "#14E8B4";
+  let welcomeMessage = "Hi! Ask me anything about this business.";
+  let conversationId = null;
+  let knownMessageCount = 0;
+  let pollTimer = null;
 
   const style = document.createElement("style");
   style.textContent = `
     #chatcore-bubble {
       position: fixed; bottom: 20px; right: 20px;
       width: 56px; height: 56px; border-radius: 50%;
-      background: #14E8B4; border: none; cursor: pointer;
+      border: none; cursor: pointer;
       box-shadow: 0 4px 16px rgba(0,0,0,0.25);
       display: flex; align-items: center; justify-content: center;
       z-index: 999999; font-size: 24px;
@@ -35,7 +39,7 @@
     }
     #chatcore-window.open { display: flex; }
     #chatcore-header {
-      background: #14E8B4; color: #0B0E14; padding: 12px 14px;
+      color: #0B0E14; padding: 12px 14px;
       font-weight: 600; font-size: 14px;
     }
     #chatcore-messages {
@@ -44,14 +48,17 @@
     }
     .chatcore-msg { max-width: 85%; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4; }
     .chatcore-msg.bot { background: #191D27; color: #F7F9FA; border-bottom-left-radius: 2px; align-self: flex-start; }
-    .chatcore-msg.user { background: #0FA383; color: #fff; border-bottom-right-radius: 2px; align-self: flex-end; }
+    .chatcore-msg.business { background: #2A2140; color: #F7F9FA; border-bottom-left-radius: 2px; align-self: flex-start; border: 1px solid #7C5CFA; }
+    .chatcore-msg.business .chatcore-label { color: #B79CFF; }
+    .chatcore-msg.user { color: #fff; border-bottom-right-radius: 2px; align-self: flex-end; }
+    .chatcore-label { font-size: 9px; text-transform: uppercase; opacity: 0.7; margin-bottom: 3px; display: block; }
     #chatcore-input-row { display: flex; border-top: 1px solid #232733; padding: 8px; gap: 6px; }
     #chatcore-input {
       flex: 1; background: #0B0E14; border: 1px solid #232733; border-radius: 8px;
       padding: 8px 10px; color: #F7F9FA; font-size: 13px; outline: none;
     }
     #chatcore-send {
-      background: #14E8B4; border: none; border-radius: 8px; padding: 8px 12px;
+      border: none; border-radius: 8px; padding: 8px 12px;
       font-weight: 600; font-size: 13px; cursor: pointer; color: #0B0E14;
     }
     #chatcore-lead-form { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -61,7 +68,7 @@
       padding: 8px 10px; color: #F7F9FA; font-size: 13px; outline: none;
     }
     #chatcore-lead-form button {
-      background: #14E8B4; border: none; border-radius: 8px; padding: 9px;
+      border: none; border-radius: 8px; padding: 9px;
       font-weight: 600; font-size: 13px; cursor: pointer; color: #0B0E14;
     }
   `;
@@ -99,11 +106,46 @@
   const nameInput = win.querySelector("#chatcore-name");
   const emailInput = win.querySelector("#chatcore-email");
   const startBtn = win.querySelector("#chatcore-start");
+  const headerEl = win.querySelector("#chatcore-header");
+
+  function applyColor(color) {
+    bubble.style.background = color;
+    headerEl.style.background = color;
+    sendBtn.style.background = color;
+    startBtn.style.background = color;
+    document
+      .querySelectorAll(".chatcore-msg.user")
+      .forEach((el) => (el.style.background = color));
+  }
+
+  fetch(`${API_BASE}/chat/${businessId}/config`)
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.widget_color) {
+        widgetColor = data.widget_color;
+        applyColor(widgetColor);
+      }
+      if (data.welcome_message) {
+        welcomeMessage = data.welcome_message;
+      }
+    })
+    .catch(() => applyColor(widgetColor));
+
+  applyColor(widgetColor);
 
   function addMessage(text, sender) {
     const div = document.createElement("div");
     div.className = `chatcore-msg ${sender}`;
-    div.textContent = text;
+    if (sender === "business") {
+      const label = document.createElement("span");
+      label.className = "chatcore-label";
+      label.textContent = "Business owner";
+      div.appendChild(label);
+      div.appendChild(document.createTextNode(text));
+    } else {
+      div.textContent = text;
+    }
+    if (sender === "user") div.style.background = widgetColor;
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -115,13 +157,13 @@
   startBtn.addEventListener("click", () => {
     visitorName = nameInput.value.trim();
     visitorEmail = emailInput.value.trim();
-    leadCaptured = true;
 
     leadForm.style.display = "none";
     messagesEl.style.display = "flex";
     inputRow.style.display = "flex";
 
-    addMessage("Hi! Ask me anything about this business.", "bot");
+    addMessage(welcomeMessage, "bot");
+    knownMessageCount = 1; // welcome message counts locally, not from server yet
   });
 
   async function sendMessage() {
@@ -138,13 +180,43 @@
           message: text,
           name: visitorName,
           email: visitorEmail,
+          conversationId,
         }),
       });
       const data = await res.json();
       addMessage(data.reply || "Sorry, something went wrong.", "bot");
+
+      if (data.conversationId) {
+        conversationId = data.conversationId;
+        startPolling();
+      }
     } catch (err) {
       addMessage("Sorry, I couldn't connect right now.", "bot");
     }
+  }
+
+  function startPolling() {
+    if (pollTimer) return; // already polling
+    pollTimer = setInterval(async () => {
+      if (!conversationId) return;
+      try {
+        const res = await fetch(
+          `${API_BASE}/chat/${businessId}/conversation/${conversationId}/messages`,
+        );
+        const data = await res.json();
+        if (data.messages && data.messages.length > knownMessageCount) {
+          const newOnes = data.messages.slice(knownMessageCount);
+          newOnes.forEach((m) => {
+            if (m.sender === "business") {
+              addMessage(m.content, "business");
+            }
+          });
+          knownMessageCount = data.messages.length;
+        }
+      } catch (err) {
+        // silently ignore poll errors
+      }
+    }, 5000); // check every 5 seconds
   }
 
   sendBtn.addEventListener("click", sendMessage);

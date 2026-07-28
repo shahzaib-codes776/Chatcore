@@ -1,4 +1,13 @@
 import { useState, useEffect } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -7,14 +16,26 @@ import {
   MessageCircle,
   Loader2,
   Check,
+  Upload,
 } from "lucide-react";
 import { api } from "../api/client";
 
 export default function DashboardPage() {
   const [business, setBusiness] = useState(null);
   const [leads, setLeads] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [openConvo, setOpenConvo] = useState(null);
+  const [convoMessages, setConvoMessages] = useState([]);
+  const [replyText, setReplyText] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [analytics, setAnalytics] = useState({ total: 0, daily: [] });
   const [infoDraft, setInfoDraft] = useState("");
+  const [widgetColor, setWidgetColor] = useState("#14E8B4");
+  const [welcomeMsg, setWelcomeMsg] = useState("");
+  const [brandingSaved, setBrandingSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -26,6 +47,11 @@ export default function DashboardPage() {
       .then((data) => {
         setBusiness(data.business);
         setInfoDraft(data.business.business_info || "");
+        setWidgetColor(data.business.widget_color || "#14E8B4");
+        setWelcomeMsg(
+          data.business.welcome_message ||
+            "Hi! Ask me anything about this business.",
+        );
       })
       .catch(() => {
         localStorage.removeItem("chatcore_token");
@@ -37,6 +63,14 @@ export default function DashboardPage() {
       .then((data) => setLeads(data.leads))
       .catch(() => {});
   }, []);
+  api
+    .getConversations()
+    .then((data) => setConversations(data.conversations))
+    .catch(() => {});
+  api
+    .getAnalytics()
+    .then((data) => setAnalytics(data))
+    .catch(() => {});
 
   function handleLogout() {
     localStorage.removeItem("chatcore_token");
@@ -59,6 +93,61 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleBrandingSave() {
+    try {
+      await api.updateBranding(widgetColor, welcomeMsg);
+      setBrandingSaved(true);
+      setTimeout(() => setBrandingSaved(false), 2000);
+    } catch (err) {
+      console.error(err.message);
+    }
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError("");
+    try {
+      const data = await api.uploadDocument(file);
+      setBusiness(data.business);
+      setInfoDraft(data.business.business_info);
+    } catch (err) {
+      setUploadError(err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+  async function openConversation(id) {
+    setOpenConvo(id);
+    try {
+      const data = await api.getConversationMessages(id);
+      setConvoMessages(data.messages);
+    } catch (err) {
+      console.error(err.message);
+    }
+  }
+
+  async function sendReply() {
+    if (!replyText.trim() || !openConvo) return;
+    setReplying(true);
+    try {
+      await api.replyToConversation(openConvo, replyText);
+      setConvoMessages((prev) => [
+        ...prev,
+        { sender: "business", content: replyText, created_at: new Date() },
+      ]);
+      setReplyText("");
+      const updated = await api.getConversations();
+      setConversations(updated.conversations);
+    } catch (err) {
+      console.error(err.message);
+    } finally {
+      setReplying(false);
+    }
+  }
   if (loading) {
     return <div style={styles.loadingPage}>Loading your dashboard...</div>;
   }
@@ -99,6 +188,28 @@ export default function DashboardPage() {
               onChange={(e) => setInfoDraft(e.target.value)}
               placeholder="e.g. We are a clothing store based in Rawalpindi. We sell shirts, jeans, and shoes. Delivery takes 3-5 days across Pakistan. We accept cash on delivery and bank transfer..."
             />
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={styles.uploadBtn}>
+                {uploading ? (
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                ) : (
+                  <Upload size={14} />
+                )}
+                {uploading ? "Processing..." : "Upload a PDF document"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleFileUpload}
+                  style={{ display: "none" }}
+                  disabled={uploading}
+                />
+              </label>
+              {uploadError && <div style={styles.error}>{uploadError}</div>}
+            </div>
 
             {error && <div style={styles.error}>{error}</div>}
 
@@ -167,6 +278,91 @@ export default function DashboardPage() {
           </section>
         </div>
 
+        <section style={{ ...styles.card, marginTop: 20 }}>
+          <div style={styles.cardHeader}>
+            <span style={styles.cardEyebrow}>ANALYTICS</span>
+            <h2 style={styles.cardTitle}>Conversations over time</h2>
+            <p style={styles.cardSubtitle}>
+              {analytics.total} total conversation
+              {analytics.total !== 1 ? "s" : ""}.
+            </p>
+          </div>
+
+          {analytics.daily.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={analytics.daily}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#232733" />
+                <XAxis dataKey="date" stroke="#8B93A3" fontSize={12} />
+                <YAxis stroke="#8B93A3" fontSize={12} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#191D27",
+                    border: "1px solid #232733",
+                    borderRadius: 8,
+                  }}
+                  labelStyle={{ color: "#F7F9FA" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#14E8B4"
+                  strokeWidth={2}
+                  dot={{ fill: "#14E8B4" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+              No data yet. Charts will appear once visitors start chatting.
+            </p>
+          )}
+        </section>
+
+        <section style={{ ...styles.card, marginTop: 20 }}>
+          <div style={styles.cardHeader}>
+            <span style={styles.cardEyebrow}>BRANDING</span>
+            <h2 style={styles.cardTitle}>Customize your widget</h2>
+            <p style={styles.cardSubtitle}>Match the widget to your brand.</p>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <label style={styles.label}>WIDGET COLOR</label>
+              <input
+                type="color"
+                value={widgetColor}
+                onChange={(e) => setWidgetColor(e.target.value)}
+                style={{
+                  width: 50,
+                  height: 38,
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
+                  background: "none",
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <label style={styles.label}>WELCOME MESSAGE</label>
+              <input
+                style={styles.input}
+                value={welcomeMsg}
+                onChange={(e) => setWelcomeMsg(e.target.value)}
+              />
+            </div>
+            <button style={styles.saveBtn} onClick={handleBrandingSave}>
+              {brandingSaved ? <Check size={15} /> : <Save size={15} />}
+              {brandingSaved ? "Saved" : "Save branding"}
+            </button>
+          </div>
+        </section>
+
         {/* LEADS SECTION */}
         <section style={{ ...styles.card, marginTop: 20 }}>
           <div style={styles.cardHeader}>
@@ -198,8 +394,30 @@ export default function DashboardPage() {
                       marginBottom: 6,
                     }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 13.5,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
                       {lead.name || "Anonymous visitor"}
+                      {lead.needs_human && (
+                        <span
+                          style={{
+                            background: "#F87171",
+                            color: "#0B0E14",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 7px",
+                            borderRadius: 6,
+                          }}
+                        >
+                          NEEDS ATTENTION
+                        </span>
+                      )}
                     </span>
                     <span
                       style={{ color: "var(--text-secondary)", fontSize: 11.5 }}
@@ -225,6 +443,149 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
+        </section>
+        <section style={{ ...styles.card, marginTop: 20 }}>
+          <div style={styles.cardHeader}>
+            <span style={styles.cardEyebrow}>CONVERSATIONS</span>
+            <h2 style={styles.cardTitle}>Chat history</h2>
+            <p style={styles.cardSubtitle}>
+              Open a conversation to view the full thread and reply.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 16 }}>
+            <div
+              style={{
+                flex: "0 0 240px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                maxHeight: 400,
+                overflowY: "auto",
+              }}
+            >
+              {conversations.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => openConversation(c.id)}
+                  style={{
+                    background:
+                      openConvo === c.id
+                        ? "var(--accent-teal-dim)"
+                        : "var(--bg-elevated)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 8,
+                    padding: 10,
+                    cursor: "pointer",
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between" }}
+                  >
+                    <strong>{c.visitor_name || "Anonymous"}</strong>
+                    {c.needs_human && !c.resolved && (
+                      <span
+                        style={{
+                          background: "#F87171",
+                          color: "#0B0E14",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "1px 5px",
+                          borderRadius: 5,
+                        }}
+                      >
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      color: "var(--text-secondary)",
+                      marginTop: 4,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {c.last_message}
+                  </div>
+                </div>
+              ))}
+              {conversations.length === 0 && (
+                <p style={{ color: "var(--text-secondary)", fontSize: 12.5 }}>
+                  No conversations yet.
+                </p>
+              )}
+            </div>
+
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              {!openConvo ? (
+                <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+                  Select a conversation to view it.
+                </p>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      flex: 1,
+                      maxHeight: 320,
+                      overflowY: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {convoMessages.map((m, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          alignSelf:
+                            m.sender === "visitor" ? "flex-start" : "flex-end",
+                          background:
+                            m.sender === "visitor"
+                              ? "var(--bg-elevated)"
+                              : "var(--accent-teal-dim)",
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          fontSize: 13,
+                          maxWidth: "75%",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "var(--text-secondary)",
+                            marginBottom: 3,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {m.sender}
+                        </div>
+                        {m.content}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      style={{ ...styles.input, flex: 1 }}
+                      placeholder="Type your reply..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                    />
+                    <button
+                      style={styles.saveBtn}
+                      onClick={sendReply}
+                      disabled={replying}
+                    >
+                      {replying ? "Sending..." : "Reply"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </section>
       </main>
 
@@ -324,6 +685,36 @@ const styles = {
     fontSize: 14,
     lineHeight: 1.6,
     resize: "vertical",
+    outline: "none",
+  },
+  uploadBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    background: "var(--bg-elevated)",
+    border: "1px dashed var(--border-subtle)",
+    borderRadius: 8,
+    padding: "8px 14px",
+    color: "var(--text-secondary)",
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  label: {
+    display: "block",
+    fontFamily: "var(--font-mono)",
+    fontSize: 11,
+    letterSpacing: "0.06em",
+    color: "var(--text-secondary)",
+    marginBottom: 6,
+  },
+  input: {
+    width: "100%",
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: 8,
+    padding: "10px 12px",
+    color: "var(--text-primary)",
+    fontSize: 14,
     outline: "none",
   },
   error: { color: "var(--error)", fontSize: 12.5, marginTop: 10 },

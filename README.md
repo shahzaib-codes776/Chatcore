@@ -1,34 +1,37 @@
 # ChatCore
 
-An AI-powered chat widget that any business can embed on their website. It answers visitor questions using the business's own information, captures leads automatically, and gives business owners a simple dashboard to manage it all.
+An AI-powered chat widget that any business can embed on their website. It answers visitor questions using the business's own information, captures leads automatically, and gives business owners a full dashboard to manage conversations, branding, and analytics.
 
 Built by [DelVoxe](https://github.com/shahzaib-codes776/delvoxe).
 
 ## What it does
 
-- A business owner signs up and describes their business (services, FAQs, pricing) in a simple dashboard
-- They get a one-line embed script to add to their website
+- A business owner signs up and describes their business (services, FAQs, pricing) — either typed directly or uploaded as a PDF
+- They get a one-line embed script to add to their website, with their own brand color and welcome message
 - Visitors chat with an AI assistant that answers using only that business's information
-- Every conversation is saved as a lead (name, email, message) and visible on the dashboard
-- If the AI doesn't have an answer, it says so honestly instead of making one up
+- Every conversation is saved with full message history and visible on the dashboard
+- If the AI isn't confident in its answer, the business owner is emailed instantly and can reply directly from the dashboard — the visitor sees the reply live in the widget
+- Analytics show conversation volume over time
 
 ## Tech stack
 
-| Layer             | Technology                   |
-| ----------------- | ---------------------------- |
-| Backend           | Node.js, Express             |
-| Database          | PostgreSQL                   |
-| Authentication    | JWT, bcrypt password hashing |
-| AI                | Google Gemini API            |
-| Dashboard         | React (Vite)                 |
-| Embeddable widget | Vanilla JavaScript           |
+| Layer               | Technology                   |
+| ------------------- | ---------------------------- |
+| Backend             | Node.js, Express             |
+| Database            | PostgreSQL                   |
+| Authentication      | JWT, bcrypt password hashing |
+| AI                  | Google Gemini API            |
+| Email notifications | Nodemailer (Gmail SMTP)      |
+| Document parsing    | pdf-parse                    |
+| Dashboard           | React (Vite), Recharts       |
+| Embeddable widget   | Vanilla JavaScript           |
 
 ## Project structure
 
 ```
 chatcore/
 ├── code/
-│   ├── backend/      → API server, database, authentication, AI integration
+│   ├── backend/      → API server, database, authentication, AI integration, email
 │   ├── dashboard/     → React dashboard for business owners
 │   └── widget/        → Embeddable chat widget (plain JS)
 ├── planning/          → Requirements and architecture docs
@@ -40,27 +43,33 @@ chatcore/
 
 - Passwords are hashed with bcrypt, never stored in plain text
 - Authentication uses JWT tokens
-- Each business's data (info, leads) is isolated — no business can access another's data
+- Each business's data (info, conversations, leads) is isolated — no business can access another's data
 - API keys and secrets are kept in environment variables, never committed to the repository
 
-## Status: v1.0 (Tier 1 — Foundation)
+## Status: v2.0 (Tier 1 + Tier 2 complete)
 
-Core features are complete and working:
+### Tier 1 — Foundation
 
 - [x] Secure signup/login
 - [x] Business dashboard (add/update business info)
 - [x] Embeddable AI chat widget
 - [x] Lead capture
-- [x] Leads visible on dashboard
 - [x] Real AI responses grounded in business data
 
-### Roadmap (Tier 2+)
+### Tier 2 — Growth
 
-- [ ] Automatic website content import (no manual data entry)
-- [ ] Multiple knowledge sources (PDF uploads, multiple pages)
-- [ ] Custom widget branding per client
-- [ ] Human handoff for unresolved conversations
+- [x] PDF document upload (auto-extracts and adds to the knowledge base)
+- [x] Custom widget branding (color, welcome message)
+- [x] Analytics (conversation volume over time)
+- [x] Human handoff — AI uncertainty detection, instant email alert, dashboard reply, live widget update
+
+### Roadmap (Tier 3)
+
+- [ ] Automatic website content import (crawl a URL instead of manual entry)
 - [ ] Multi-channel support (WhatsApp, Instagram)
+- [ ] CRM integrations
+- [ ] Team accounts with roles/permissions
+- [ ] Compliance tooling (audit logs, data export/delete)
 
 ## Getting started (development)
 
@@ -69,7 +78,7 @@ Core features are complete and working:
 ```bash
 cd code/backend
 npm install
-# add a .env file with DATABASE_URL, JWT_SECRET, PORT, and GEMINI_API_KEY
+# add a .env file with DATABASE_URL, JWT_SECRET, PORT, GEMINI_API_KEY, EMAIL_USER, EMAIL_PASS
 node index.js
 ```
 
