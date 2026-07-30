@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "https://chatcore-production-1b02.up.railway.app/api";
 
 function getToken() {
   return localStorage.getItem("chatcore_token");

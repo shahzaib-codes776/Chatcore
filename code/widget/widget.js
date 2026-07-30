@@ -1,7 +1,7 @@
 (function () {
   const script = document.currentScript;
   const businessId = script.getAttribute("data-business");
-  const API_BASE = "http://localhost:5000/api";
+  const API_BASE = "https://chatcore-production-1b02.up.railway.app/api";
 
   if (!businessId) {
     console.error(
