@@ -323,7 +323,8 @@ export default function DashboardPage() {
             <div style={styles.embedBox}>
               <span style={styles.embedLabel}>EMBED CODE</span>
               <code style={styles.embedCode}>
-                &lt;script src="chatcore.io/widget.js" data-business="
+                &lt;script src="https://chartcore-widget.netlify.app/widget.js"
+                data-business="
                 {business?.id}"&gt;&lt;/script&gt;
               </code>
             </div>
