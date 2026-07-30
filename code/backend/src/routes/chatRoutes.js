@@ -1,5 +1,17 @@
 const express = require("express");
 const pool = require("../config/db");
+const rateLimit = require("express-rate-limit");
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // max 10 messages per minute per IP
+  message: {
+    error:
+      "You're sending messages too quickly. Please wait a moment and try again.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const { sendHandoffAlert } = require("../config/mailer");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -15,7 +27,7 @@ const uncertainPhrases = [
   "not quite sure",
 ];
 
-router.post("/:businessId", async (req, res) => {
+router.post("/:businessId", chatLimiter, async (req, res) => {
   const { businessId } = req.params;
   const { message, name, email, conversationId } = req.body;
 

@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../config/db");
+const { scrapeWebsite } = require("../config/scraper");
 const authMiddleware = require("../middleware/authMiddleware");
 const multer = require("multer");
 const { PDFParse } = require("pdf-parse");
@@ -207,6 +208,46 @@ router.post("/conversations/:id/reply", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Something went wrong." });
+  }
+});
+
+router.post("/import-website", authMiddleware, async (req, res) => {
+  const { url } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: "url is required." });
+  }
+
+  try {
+    new URL(url); // validate it's a real URL format
+  } catch (e) {
+    return res.status(400).json({ error: "Please enter a valid URL." });
+  }
+
+  try {
+    const extractedText = await scrapeWebsite(url);
+
+    const current = await pool.query(
+      "SELECT business_info FROM businesses WHERE id = $1",
+      [req.business.businessId],
+    );
+
+    const existingInfo = current.rows[0].business_info || "";
+    const updatedInfo = existingInfo
+      ? `${existingInfo}\n\n--- From website import (${url}) ---\n${extractedText}`
+      : extractedText;
+
+    const result = await pool.query(
+      "UPDATE businesses SET business_info = $1 WHERE id = $2 RETURNING id, name, email, business_info, created_at",
+      [updatedInfo, req.business.businessId],
+    );
+
+    res.json({ business: result.rows[0] });
+  } catch (err) {
+    console.error(err.message);
+    res
+      .status(500)
+      .json({ error: err.message || "Failed to import the website." });
   }
 });
 

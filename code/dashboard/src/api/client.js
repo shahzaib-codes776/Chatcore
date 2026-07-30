@@ -78,4 +78,10 @@ export const api = {
       return data;
     });
   },
+  importWebsite: (url) =>
+    request("/business/import-website", {
+      method: "POST",
+      body: { url },
+      auth: true,
+    }),
 };

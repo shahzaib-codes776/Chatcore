@@ -35,6 +35,9 @@ export default function DashboardPage() {
   const [brandingSaved, setBrandingSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -58,19 +61,22 @@ export default function DashboardPage() {
         navigate("/");
       })
       .finally(() => setLoading(false));
+
     api
       .getLeads()
       .then((data) => setLeads(data.leads))
       .catch(() => {});
+
+    api
+      .getConversations()
+      .then((data) => setConversations(data.conversations))
+      .catch(() => {});
+
+    api
+      .getAnalytics()
+      .then((data) => setAnalytics(data))
+      .catch(() => {});
   }, []);
-  api
-    .getConversations()
-    .then((data) => setConversations(data.conversations))
-    .catch(() => {});
-  api
-    .getAnalytics()
-    .then((data) => setAnalytics(data))
-    .catch(() => {});
 
   function handleLogout() {
     localStorage.removeItem("chatcore_token");
@@ -120,6 +126,23 @@ export default function DashboardPage() {
       e.target.value = "";
     }
   }
+
+  async function handleWebsiteImport() {
+    if (!websiteUrl.trim()) return;
+    setImporting(true);
+    setImportError("");
+    try {
+      const data = await api.importWebsite(websiteUrl.trim());
+      setBusiness(data.business);
+      setInfoDraft(data.business.business_info);
+      setWebsiteUrl("");
+    } catch (err) {
+      setImportError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function openConversation(id) {
     setOpenConvo(id);
     try {
@@ -148,6 +171,7 @@ export default function DashboardPage() {
       setReplying(false);
     }
   }
+
   if (loading) {
     return <div style={styles.loadingPage}>Loading your dashboard...</div>;
   }
@@ -210,6 +234,34 @@ export default function DashboardPage() {
               </label>
               {uploadError && <div style={styles.error}>{uploadError}</div>}
             </div>
+
+            <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
+              <input
+                style={{ ...styles.input, flex: 1 }}
+                placeholder="https://yourbusiness.com"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+              />
+              <button
+                style={{
+                  ...styles.uploadBtn,
+                  border: "1px solid var(--border-subtle)",
+                }}
+                onClick={handleWebsiteImport}
+                disabled={importing}
+              >
+                {importing ? (
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                ) : (
+                  <Upload size={14} />
+                )}
+                {importing ? "Importing..." : "Import from website"}
+              </button>
+            </div>
+            {importError && <div style={styles.error}>{importError}</div>}
 
             {error && <div style={styles.error}>{error}</div>}
 
@@ -444,6 +496,7 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+
         <section style={{ ...styles.card, marginTop: 20 }}>
           <div style={styles.cardHeader}>
             <span style={styles.cardEyebrow}>CONVERSATIONS</span>

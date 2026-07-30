@@ -184,7 +184,10 @@
         }),
       });
       const data = await res.json();
-      addMessage(data.reply || "Sorry, something went wrong.", "bot");
+      addMessage(
+        data.reply || data.error || "Sorry, something went wrong.",
+        "bot",
+      );
 
       if (data.conversationId) {
         conversationId = data.conversationId;
