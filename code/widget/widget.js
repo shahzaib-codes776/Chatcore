@@ -1,7 +1,7 @@
 (function () {
   const script = document.currentScript;
   const businessId = script.getAttribute("data-business");
-  const API_BASE = "https://chatcore-production-1b02.up.railway.app/api";
+  const API_BASE = "http://localhost:5000/api";
 
   if (!businessId) {
     console.error(
@@ -70,6 +70,18 @@
     #chatcore-lead-form button {
       border: none; border-radius: 8px; padding: 9px;
       font-weight: 600; font-size: 13px; cursor: pointer; color: #0B0E14;
+    }
+    @media (max-width: 480px) {
+      #chatcore-window {
+        width: calc(100vw - 24px);
+        height: 70vh;
+        right: 12px;
+        bottom: 80px;
+      }
+      #chatcore-bubble {
+        right: 16px;
+        bottom: 16px;
+      }
     }
   `;
   document.head.appendChild(style);
@@ -184,10 +196,7 @@
         }),
       });
       const data = await res.json();
-      addMessage(
-        data.reply || data.error || "Sorry, something went wrong.",
-        "bot",
-      );
+      addMessage(data.reply || "Sorry, something went wrong.", "bot");
 
       if (data.conversationId) {
         conversationId = data.conversationId;

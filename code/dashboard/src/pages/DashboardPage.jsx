@@ -178,7 +178,7 @@ export default function DashboardPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.topbar}>
+      <header style={styles.topbar} className="dashboard-topbar">
         <div style={styles.logoRow}>
           <div style={styles.logoMark}>
             <Sparkles size={16} color="#0B0E14" />
@@ -193,8 +193,8 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main style={styles.main}>
-        <div style={styles.grid}>
+      <main style={styles.main} className="dashboard-main">
+        <div style={styles.grid} className="dashboard-grid">
           {/* LEFT: business info editor */}
           <section style={styles.card}>
             <div style={styles.cardHeader}>
@@ -507,7 +507,10 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 16 }}>
+          <div
+            style={{ display: "flex", gap: 16 }}
+            className="conversations-layout"
+          >
             <div
               style={{
                 flex: "0 0 240px",
@@ -517,6 +520,7 @@ export default function DashboardPage() {
                 maxHeight: 400,
                 overflowY: "auto",
               }}
+              className="conversations-list"
             >
               {conversations.map((c) => (
                 <div
