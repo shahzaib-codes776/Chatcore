@@ -13,11 +13,11 @@ const chatLimiter = rateLimit({
 });
 
 const { sendHandoffAlert } = require("../config/mailer");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Groq = require("groq-sdk");
 
 const router = express.Router();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const uncertainPhrases = [
   "not sure",
@@ -73,8 +73,6 @@ router.post("/:businessId", chatLimiter, async (req, res) => {
     const businessInfo =
       business.rows[0].business_info || "No information has been provided yet.";
 
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-
     const prompt = `You are a helpful customer support assistant for a business called "${businessName}". Answer the visitor's question using ONLY the information below. If the answer isn't in the information provided, politely say you're not sure and suggest they contact the business directly. Keep answers short and friendly (2-4 sentences).
 
 Business information:
@@ -82,8 +80,11 @@ ${businessInfo}
 
 Visitor's question: ${message}`;
 
-    const result = await model.generateContent(prompt);
-    const reply = result.response.text();
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+    });
+    const reply = completion.choices[0].message.content;
 
     // Save the AI's reply
     await pool.query(
