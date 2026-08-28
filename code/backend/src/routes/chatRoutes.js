@@ -70,8 +70,14 @@ router.post("/:businessId", chatLimiter, async (req, res) => {
     );
 
     const businessName = business.rows[0].name;
-    const businessInfo =
+    let businessInfo =
       business.rows[0].business_info || "No information has been provided yet.";
+
+    // Keep the prompt within Groq's free-tier token limits
+    const MAX_INFO_LENGTH = 6000;
+    if (businessInfo.length > MAX_INFO_LENGTH) {
+      businessInfo = businessInfo.slice(0, MAX_INFO_LENGTH);
+    }
 
     const prompt = `You are a helpful customer support assistant for a business called "${businessName}". Answer the visitor's question using ONLY the information below. If the answer isn't in the information provided, politely say you're not sure and suggest they contact the business directly. Keep answers short and friendly (2-4 sentences).
 
