@@ -1,13 +1,13 @@
 require("dotenv").config();
 require("./src/config/db");
 const express = require("express");
-app.set("trust proxy", 1);
 const cors = require("cors");
 const authRoutes = require("./src/routes/authRoutes");
 const businessRoutes = require("./src/routes/businessRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json());
 
